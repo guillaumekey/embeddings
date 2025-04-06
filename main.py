@@ -65,6 +65,19 @@ def main():
                 # Calcul des pages similaires
                 related_pages = find_related_pages(df, filtered_urls, top_n=top_n)
 
+                # Traitement des inlinks si disponibles
+                existing_links = {}
+                if inlinks_df is not None:
+                    # Vérifier les colonnes nécessaires pour le fichier d'inlinks
+                    required_inlink_columns = ['Type', 'From', 'To', 'Status Code', 'Anchor Text']
+                    if not all(col in inlinks_df.columns for col in required_inlink_columns):
+                        st.error(
+                            f"Le fichier d'inlinks doit contenir les colonnes : {', '.join(required_inlink_columns)}")
+                        return
+
+                    # Traitement des liens existants
+                    existing_links = process_inlinks(inlinks_df)
+
                 # Table détaillée des similarités
                 st.header("Table détaillée des similarités")
                 similarity_min_score = st.slider(
@@ -76,7 +89,8 @@ def main():
                     help="Filtrer les similarités selon leur score minimum"
                 )
 
-                similarity_df = display_similarity_details(related_pages, similarity_min_score)
+                # Afficher les similarités avec les liens existants si disponibles
+                similarity_df = display_similarity_details(related_pages, similarity_min_score, existing_links)
 
                 # Bouton d'export pour la table de similarité
                 if not similarity_df.empty:
@@ -118,15 +132,7 @@ def main():
                 if inlinks_df is not None:
                     st.header("Analyse du maillage interne")
 
-                    # Vérifier les colonnes nécessaires pour le fichier d'inlinks
-                    required_inlink_columns = ['Type', 'From', 'To', 'Status Code', 'Anchor Text']
-                    if not all(col in inlinks_df.columns for col in required_inlink_columns):
-                        st.error(
-                            f"Le fichier d'inlinks doit contenir les colonnes : {', '.join(required_inlink_columns)}")
-                        return
-
                     # Analyse standard du maillage
-                    existing_links = process_inlinks(inlinks_df)
                     link_stats = analyze_linking_structure(filtered_df, existing_links)
                     display_link_analysis(link_stats)
 
@@ -174,12 +180,16 @@ def main():
                     anchor_stats = analyze_anchor_distribution(inlinks_df)
                     anchor_chart = create_anchor_distribution_chart(anchor_stats['anchor_dist'])
 
+                    # Passer les related_pages, inlinks_df et existing_links pour la vue détaillée
                     display_advanced_link_analysis(
                         broken_links_count,
                         broken_links_df,
                         incoming_links_stats,
                         anchor_stats,
-                        anchor_chart
+                        anchor_chart,
+                        related_pages,    # Ajout du paramètre related_pages
+                        inlinks_df,       # Ajout du paramètre inlinks_df
+                        existing_links    # Ajout du paramètre existing_links
                     )
 
             except Exception as e:

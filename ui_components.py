@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from typing import Dict, List
+from typing import Dict, List, Set  # Ajoutez Set ici
 
 
 def display_theme_analysis(theme_df: pd.DataFrame, min_cluster_size: int):
@@ -76,7 +76,7 @@ def display_link_recommendations(link_analysis_df: pd.DataFrame):
     )
 
 
-def display_similarity_details(related_pages: Dict[str, List[Dict]], min_score: float) -> pd.DataFrame:
+def display_similarity_details(related_pages: Dict[str, List[Dict]], min_score: float, existing_links: Dict[str, Set[str]] = None) -> pd.DataFrame:
     """
     Crée et affiche une table détaillée des similarités avec une URL par ligne,
     en évitant les doublons de relations.
@@ -84,6 +84,7 @@ def display_similarity_details(related_pages: Dict[str, List[Dict]], min_score: 
     Args:
         related_pages: Dictionnaire des pages similaires
         min_score: Score minimum de similarité à afficher
+        existing_links: Dictionnaire des liens existants
 
     Returns:
         DataFrame contenant les détails des similarités
@@ -100,12 +101,32 @@ def display_similarity_details(related_pages: Dict[str, List[Dict]], min_score: 
                 # Créer une paire triée pour éviter les doublons
                 pair = tuple(sorted([source_url, target_url]))
 
+                # Vérifier si le lien existe déjà
+                link_exists = False
+                if existing_links and source_url in existing_links:
+                    link_exists = target_url in existing_links[source_url]
+
+                # Vérifier si le lien inverse existe
+                inverse_link_exists = False
+                if existing_links and target_url in existing_links:
+                    inverse_link_exists = source_url in existing_links[target_url]
+
+                # Déterminer le type de lien
+                link_type = "Aucun lien"
+                if link_exists and inverse_link_exists:
+                    link_type = "Lien bidirectionnel"
+                elif link_exists:
+                    link_type = "Lien unidirectionnel"
+                elif inverse_link_exists:
+                    link_type = "Lien inverse seulement"
+
                 # Ne traiter la paire que si elle n'a pas déjà été vue
                 if pair not in processed_pairs:
                     similarity_data.append({
-                        'URL principale': pair[0],
-                        'URL similaire': pair[1],
-                        'Score de similarité': page['score']
+                        'URL principale': source_url,
+                        'URL similaire': target_url,
+                        'Score de similarité': page['score'],
+                        'Type de lien': link_type
                     })
                     processed_pairs.add(pair)
 
@@ -131,6 +152,10 @@ def display_similarity_details(related_pages: Dict[str, List[Dict]], min_score: 
                 'Score de similarité': st.column_config.NumberColumn(
                     'Score de similarité',
                     format="%.3f"
+                ),
+                'Type de lien': st.column_config.TextColumn(
+                    'Type de lien',
+                    width='medium'
                 )
             },
             use_container_width=True,
