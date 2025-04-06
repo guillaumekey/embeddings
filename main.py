@@ -5,10 +5,17 @@ import os
 from data_processing import read_csv, convert_embeddings, find_related_pages, analyze_themes
 from visualization import create_similarity_network, create_theme_heatmap
 from link_analysis import process_inlinks, find_linking_opportunities, analyze_linking_structure, analyze_incoming_links
+from advanced_link_analysis import (
+    analyze_broken_links,
+    analyze_incoming_links_stats,
+    analyze_anchor_distribution,
+    create_anchor_distribution_chart
+)
 from utils import get_download_link
 from config import setup_page, setup_sidebar
 from ui_components import display_theme_analysis, display_link_analysis, display_link_recommendations, \
     display_similarity_details
+from ui_link_analysis import display_advanced_link_analysis
 from filters import apply_url_filters
 
 
@@ -34,7 +41,7 @@ def main():
                 # Vérification des colonnes
                 required_columns = ['URL', 'Embeddings']
                 if not all(col in df.columns for col in required_columns):
-                    st.error(f"Le fichier doit contenir les colonnes : URL, Embeddings")
+                    st.error(f"Le fichier d'embeddings doit contenir les colonnes : URL, Embeddings")
                     return
 
                 # Configuration des paramètres
@@ -78,7 +85,7 @@ def main():
                         data=similarity_df.to_csv(index=False).encode('utf-8'),
                         file_name="similarites_detaillees.csv",
                         mime="text/csv",
-                        key="download_similarities"  # Ajout d'une clé unique
+                        key="download_similarities"
                     )
 
                 # Analyse thématique
@@ -111,18 +118,16 @@ def main():
                 if inlinks_df is not None:
                     st.header("Analyse du maillage interne")
 
-                    # Traitement des inlinks
+                    # Vérifier les colonnes nécessaires pour le fichier d'inlinks
+                    required_inlink_columns = ['Type', 'From', 'To', 'Status Code', 'Anchor Text']
+                    if not all(col in inlinks_df.columns for col in required_inlink_columns):
+                        st.error(
+                            f"Le fichier d'inlinks doit contenir les colonnes : {', '.join(required_inlink_columns)}")
+                        return
+
+                    # Analyse standard du maillage
                     existing_links = process_inlinks(inlinks_df)
-
-                    # Analyse des statistiques de liens
-                    if filtered_urls:
-                        filtered_df = df[df['URL'].isin(filtered_urls)]
-                    else:
-                        filtered_df = df
-
                     link_stats = analyze_linking_structure(filtered_df, existing_links)
-
-                    # Affichage des métriques
                     display_link_analysis(link_stats)
 
                     # Analyse des liens entrants et recommandés
@@ -163,8 +168,23 @@ def main():
                         # Export des opportunités avec une clé unique
                         st.markdown(get_download_link(opportunities, "opportunities"), unsafe_allow_html=True)
 
+                    # Analyse avancée du maillage interne
+                    broken_links_count, broken_links_df = analyze_broken_links(inlinks_df)
+                    incoming_links_stats = analyze_incoming_links_stats(inlinks_df)
+                    anchor_stats = analyze_anchor_distribution(inlinks_df)
+                    anchor_chart = create_anchor_distribution_chart(anchor_stats['anchor_dist'])
+
+                    display_advanced_link_analysis(
+                        broken_links_count,
+                        broken_links_df,
+                        incoming_links_stats,
+                        anchor_stats,
+                        anchor_chart
+                    )
+
             except Exception as e:
                 st.error(f"Une erreur s'est produite lors du traitement : {str(e)}")
+                st.exception(e)  # Afficher la trace complète pour le débogage
 
 
 if __name__ == "__main__":
